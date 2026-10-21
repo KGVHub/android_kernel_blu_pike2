@@ -911,4 +911,17 @@ config INPUT_STK8BAXX_I2C
 
 	  To compile this driver as a module, choose M here.
 source "drivers/input/misc/lis2dh/Kconfig"
+
+config INPUT_SC7A30_I2C
+	tristate "Silan SC7A20/SC7A30 accelerometer (I2C)"
+	depends on I2C && OF
+	help
+	  Say Y here to enable the Silan SC7A20 3-axis accelerometer
+	  ("SC,sc7a20_acc" in the device tree) found on Spreadtrum
+	  SC7731E tablets such as the iBall Slide Skye 03. It reports
+	  through an input device named "accelerometer" for the
+	  Spreadtrum sensors HAL.
+
+	  To compile this driver as a module, choose M here: the
+	  module will be called sc7a20_acc.
 endif

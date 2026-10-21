@@ -90,3 +90,4 @@ obj-$(CONFIG_INPUT_AKM09911)          += akm09911.o
 obj-$(CONFIG_INPUT_STK8BAXX_I2C)          += stk8baxx.o
 obj-$(CONFIG_INPUT_MC34XX_I2C)          += mc34xx.o
 obj-$(CONFIG_INPUT_LIS2DH) += lis2dh/
+obj-$(CONFIG_INPUT_SC7A30_I2C) += sc7a20/
