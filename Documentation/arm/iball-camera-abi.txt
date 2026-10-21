@@ -33,3 +33,14 @@ copy lengths, and wrong direction/magic/size/number. ASan/UBSan passed
 This is a candidate compatibility fix, not proof that the entire camera
 pipeline works. It still requires real hardware preview, front-camera,
 and capture tests. Do not describe the camera as working until these pass.
+
+Hardware validation, 2026-10-22
+-------------------------------
+The debug image booted Android successfully on the Slide Skye 03. The old
+rejected ioctls disappeared. Rear preview configured NV21 1280x720, front
+preview NV21 640x480, and switching between sensors worked. Both previews
+responded to a lit scene, and shutter capture saved JPEGs from both sensors.
+Initial black frames were resolved by pointing the tablet at light; rear AE
+luminance changed from 0 to 89. These checks establish preview/capture
+operation, not a calibrated assessment of exposure, color, or optical quality.
+The stock logs also contain the ISP smart-parameter warnings seen in this test.
