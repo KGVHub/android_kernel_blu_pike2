@@ -609,4 +609,15 @@ source "drivers/misc/sprd_audio/Kconfig"
 source "drivers/misc/dual-sim-plug/Kconfig"
 source "drivers/misc/sprd_otp/Kconfig"
 source "drivers/misc/ir-peel/Kconfig"
+config KGV_KLOG
+	bool "Debug: expose the kernel log at /proc/kgv_klog"
+	depends on PRINTK && PROC_FS
+	default n
+	help
+	  Debug aid for Android "user" builds, where SELinux stops adb shell
+	  from reading the kernel log. Creates a world-readable
+	  /proc/kgv_klog with a snapshot of the log buffer.
+
+	  This bypasses dmesg restrictions. Say N unless debugging.
+
 endmenu

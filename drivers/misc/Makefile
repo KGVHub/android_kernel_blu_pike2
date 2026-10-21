@@ -76,3 +76,4 @@ obj-$(CONFIG_SPI_PEEL_INFRARED)	+= ir-peel/
 obj-$(CONFIG_SPRD_TMC)		+= sprd_tmc.o
 obj-$(CONFIG_QOS_SECURE_SETTING)        += secure_qos_setting.o
 obj-y		+= cdc_com.o
+obj-$(CONFIG_KGV_KLOG)		+= kgv_klog.o
