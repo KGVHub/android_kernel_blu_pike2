@@ -2212,4 +2212,4 @@ source "lib/Kconfig"
 
 source "arch/arm/kvm/Kconfig"
 
-source "../vendor/sprd/modules/wcn/fm/driver/fm_sipc/Kconfig"
+# (out-of-tree SDK, not in this repo) source "../vendor/sprd/modules/wcn/fm/driver/fm_sipc/Kconfig"

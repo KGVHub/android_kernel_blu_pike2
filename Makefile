@@ -909,10 +909,13 @@ vmlinux-dirs	:= $(patsubst %/,%,$(filter %/, $(init-y) $(init-m) \
 vmlinux-alldirs	:= $(sort $(vmlinux-dirs) $(patsubst %/,%,$(filter %/, \
 		     $(init-) $(core-) $(drivers-) $(net-) $(libs-) $(virt-))))
 
+# BLU's prebuilt UDC library is not in this tree; only link it when UDC is enabled
+ifdef CONFIG_UDC
 ifeq ($(strip $(TARGET_BUILD_VARIANT)),userdebug)
 udc-lib		:= $(srctree)/drivers/udc/lib/libudc_k_7731ef_9820e_debug.a
 else
 udc-lib		:= $(srctree)/drivers/udc/lib/libudc_k_7731ef_9820e.a
+endif
 endif
 
 init-y		:= $(patsubst %/, %/built-in.o, $(init-y))
