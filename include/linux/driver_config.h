@@ -55,7 +55,13 @@
 //用来判断A OR B板的GPIO口
 //#define GPIO_BOARD_DIFF 131
 
-#define WW6_DRV_CAMERA_MAIN_SUB_EXCHANGE
+/*
+ * KGV: the BLU board swaps its main and sub camera connectors; the iBall
+ * Slide Skye 03 does not (main GC2385 at 0x37 uses power-down GPIO 39 as in
+ * the stock device tree). With the swap the main sensor never leaves
+ * power-down and does not answer on I2C.
+ */
+//#define WW6_DRV_CAMERA_MAIN_SUB_EXCHANGE
 
 // 0								/*15 ma*/
 // (BIT(0))							/*30 ma*/
