@@ -13,6 +13,17 @@ if INPUT_TOUCHSCREEN
 
 source drivers/input/touchscreen/adaptive-ts/Kconfig
 
+config TOUCHSCREEN_HYNCST21680
+	tristate "Hynitron CST21680 (cst2xx) touchscreen"
+	depends on I2C && OF
+	help
+	  Say Y here to enable the Hynitron CST2xx/CST21680 capacitive
+	  touchscreen found on Spreadtrum SC7731E tablets such as the
+	  iBall Slide Skye 03 ("cst2xx,cst2xx_ts" in the device tree).
+
+	  To compile this driver as a module, choose M here: the
+	  module will be called cst2xx_ts.
+
 source drivers/input/touchscreen/synaptics_dsx/Kconfig
 
 config TOUCHSCREEN_PROPERTIES

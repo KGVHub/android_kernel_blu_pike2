@@ -1,0 +1,1 @@
+obj-$(CONFIG_TOUCHSCREEN_HYNCST21680)	+= cst2xx_ts.o
