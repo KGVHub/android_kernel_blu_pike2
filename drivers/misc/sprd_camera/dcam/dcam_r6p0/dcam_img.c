@@ -3035,6 +3035,62 @@ static int dcam_free_iova(struct device *dev,
 
 
 
+/*
+ * The Android 8.1 iBall HAL uses the 956-byte sprd_img_parm ABI from
+ * before ebd_ctrl was inserted ahead of reserved[].  Keep the native ABI
+ * and translate only these exact older write commands.  In libcamoem.so,
+ * cmr_grab_cap_cfg sends 0x43bc5a07, with crop/dst at offsets 128/144
+ * and the tail at 940 (native reserved[] starts at 952).
+ */
+#define SPRD_IMG_PARM_V1_SIZE 956
+
+static unsigned int sprd_img_parm_native_cmd(unsigned int cmd)
+{
+	if (_IOC_TYPE(cmd) != SPRD_IMG_IO_MAGIC ||
+	    _IOC_DIR(cmd) != _IOC_WRITE ||
+	    _IOC_SIZE(cmd) != SPRD_IMG_PARM_V1_SIZE)
+		return cmd;
+
+	switch (_IOC_NR(cmd)) {
+	case 4: /* SET_FRM_ID_BASE */
+		return SPRD_IMG_IO_SET_FRM_ID_BASE;
+	case 5: /* SET_CROP */
+		return SPRD_IMG_IO_SET_CROP;
+	case 7: /* SET_OUTPUT_SIZE */
+		return SPRD_IMG_IO_SET_OUTPUT_SIZE;
+	case 10: /* SET_FRAME_ADDR */
+		return SPRD_IMG_IO_SET_FRAME_ADDR;
+	case 11: /* PATH_FRM_DECI */
+		return SPRD_IMG_IO_PATH_FRM_DECI;
+	case 12: /* PATH_PAUSE */
+		return SPRD_IMG_IO_PATH_PAUSE;
+	default:
+		return cmd;
+	}
+}
+
+static unsigned long sprd_img_copy_parm(struct sprd_img_parm *parm,
+				      unsigned long arg, unsigned int cmd)
+{
+	const char __user *src = (const char __user *)arg;
+	size_t prefix = offsetof(struct sprd_img_parm, ebd_ctrl);
+	unsigned long ret;
+
+	BUILD_BUG_ON(offsetof(struct sprd_img_parm, ebd_ctrl) != 940);
+	BUILD_BUG_ON(sizeof(struct sprd_img_parm) != 968);
+	BUILD_BUG_ON(SPRD_IMG_PARM_V1_SIZE != 940 + sizeof(parm->reserved));
+
+	if (sprd_img_parm_native_cmd(cmd) == cmd)
+		return copy_from_user(parm, src, sizeof(*parm));
+
+	memset(parm, 0, sizeof(*parm));
+	ret = copy_from_user(parm, src, prefix);
+	if (ret)
+		return ret;
+	return copy_from_user(parm->reserved, src + prefix,
+			      sizeof(parm->reserved));
+}
+
 static long sprd_img_k_ioctl(struct file *file, unsigned int cmd,
 			     unsigned long arg)
 {
@@ -3067,7 +3123,7 @@ static long sprd_img_k_ioctl(struct file *file, unsigned int cmd,
 
 	info = &dev->dcam_cxt;
 
-	switch (cmd) {
+	switch (sprd_img_parm_native_cmd(cmd)) {
 	case SPRD_IMG_IO_SET_MODE:
 		mutex_lock(&dev->dcam_mutex);
 		ret = copy_from_user(&mode, (void __user *)arg,
@@ -3157,8 +3213,7 @@ static long sprd_img_k_ioctl(struct file *file, unsigned int cmd,
 
 	case SPRD_IMG_IO_SET_FRM_ID_BASE:
 		mutex_lock(&dev->dcam_mutex);
-		ret = copy_from_user(&parm, (void __user *)arg,
-			sizeof(struct sprd_img_parm));
+		ret = sprd_img_copy_parm(&parm, arg, cmd);
 		if (ret) {
 			pr_err("sprd_img_k_ioctl: fail to get user info.\n");
 			mutex_unlock(&dev->dcam_mutex);
@@ -3186,8 +3241,7 @@ static long sprd_img_k_ioctl(struct file *file, unsigned int cmd,
 
 	case SPRD_IMG_IO_SET_CROP:
 		mutex_lock(&dev->dcam_mutex);
-		ret = copy_from_user(&parm, (void __user *)arg,
-				sizeof(struct sprd_img_parm));
+		ret = sprd_img_copy_parm(&parm, arg, cmd);
 		if (ret) {
 			pr_err("sprd_img_k_ioctl: fail to get user info.\n");
 			mutex_unlock(&dev->dcam_mutex);
@@ -3234,8 +3288,7 @@ static long sprd_img_k_ioctl(struct file *file, unsigned int cmd,
 	case SPRD_IMG_IO_SET_OUTPUT_SIZE:
 		DCAM_TRACE("set output size.\n");
 		mutex_lock(&dev->dcam_mutex);
-		ret = copy_from_user(&parm, (void __user *)arg,
-				sizeof(struct sprd_img_parm));
+		ret = sprd_img_copy_parm(&parm, arg, cmd);
 		if (ret) {
 			pr_err("sprd_img_k_ioctl: fail to get user info.\n");
 			mutex_unlock(&dev->dcam_mutex);
@@ -3290,8 +3343,7 @@ static long sprd_img_k_ioctl(struct file *file, unsigned int cmd,
 	case SPRD_IMG_IO_SET_FRAME_ADDR:
 		DCAM_TRACE("set frame addr.\n");
 		mutex_lock(&dev->dcam_mutex);
-		ret = copy_from_user(&parm, (void __user *)arg,
-				sizeof(struct sprd_img_parm));
+		ret = sprd_img_copy_parm(&parm, arg, cmd);
 		if (ret) {
 			pr_err("sprd_img_k_ioctl: fail to get user info.\n");
 			mutex_unlock(&dev->dcam_mutex);
@@ -3303,8 +3355,7 @@ static long sprd_img_k_ioctl(struct file *file, unsigned int cmd,
 
 	case SPRD_IMG_IO_PATH_FRM_DECI:
 		mutex_lock(&dev->dcam_mutex);
-		ret = copy_from_user(&parm, (void __user *)arg,
-				sizeof(struct sprd_img_parm));
+		ret = sprd_img_copy_parm(&parm, arg, cmd);
 		if (ret) {
 			pr_err("sprd_img_k_ioctl: fail to get user info.\n");
 			mutex_unlock(&dev->dcam_mutex);
@@ -3319,8 +3370,7 @@ static long sprd_img_k_ioctl(struct file *file, unsigned int cmd,
 
 	case SPRD_IMG_IO_SET_SHRINK:
 		mutex_lock(&dev->dcam_mutex);
-		ret = copy_from_user(&parm, (void __user *)arg,
-				sizeof(struct sprd_img_parm));
+		ret = sprd_img_copy_parm(&parm, arg, cmd);
 		if (ret) {
 			pr_err("sprd_img_k_ioctl: fail to get user info.\n");
 			mutex_unlock(&dev->dcam_mutex);
@@ -3334,8 +3384,7 @@ static long sprd_img_k_ioctl(struct file *file, unsigned int cmd,
 		break;
 
 	case SPRD_IMG_IO_PATH_PAUSE:
-		ret = copy_from_user(&parm, (void __user *)arg,
-					sizeof(struct sprd_img_parm));
+		ret = sprd_img_copy_parm(&parm, arg, cmd);
 		if (ret) {
 			pr_err("sprd_img_k_ioctl: fail to get user info.\n");
 			goto exit;
@@ -3549,8 +3598,7 @@ static long sprd_img_k_ioctl(struct file *file, unsigned int cmd,
 	 *yuv422: image_vc:1    image_dt: 0x1e
 	 */
 		mutex_lock(&dev->dcam_mutex);
-		ret = copy_from_user(&parm, (void __user *)arg,
-				sizeof(struct sprd_img_parm));
+		ret = sprd_img_copy_parm(&parm, arg, cmd);
 		if (ret) {
 			pr_err("failed to get user info.\n");
 			mutex_unlock(&dev->dcam_mutex);
@@ -3672,7 +3720,8 @@ static long sprd_img_k_ioctl(struct file *file, unsigned int cmd,
 			sprd_img_isp_unreg_isr(dev);
 		break;
 	default:
-		pr_err("sprd_img_k_ioctl: invalid cmd NR %u\n", _IOC_NR(cmd));
+		pr_err("sprd_img_k_ioctl: invalid cmd 0x%08x NR %u size %u dir %u\n",
+		       cmd, _IOC_NR(cmd), _IOC_SIZE(cmd), _IOC_DIR(cmd));
 		break;
 	}
 

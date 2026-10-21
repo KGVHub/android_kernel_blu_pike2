@@ -1,0 +1,35 @@
+iBall Slide Skye 03 camera ioctl compatibility
+=============================================
+
+The stock Android 8.1 libcamoem.so uses 956-byte sprd_img_parm commands;
+this tree's native structure is 968 bytes. ioctl dispatch includes the
+encoded size, so the native switch rejected crop/output/deci requests.
+
+Evidence from blobs/vendor/lib/libcamoem.so (ARM32 Thumb), SHA256:
+8ff7a7aaa75ba7750ea79a6e7af31f40bdd14e16548586486636313d08d851ba
+
+  cmr_grab_cap_cfg, 0x32760: clears 956 bytes
+  0x327d4: crop_rect at argument + 128
+  0x32790/0x32796: dst_size at argument + 144/148
+  0x327b2/0x327dc: writes three tail words at argument + 940
+  0x327e0/0x327e4: SET_OUTPUT_SIZE = 0x43bc5a07
+  0x32ba4/0x32bb0: SET_CROP = 0x43bc5a05
+  0x32bb6: PATH_FRM_DECI = SET_CROP + 6 = 0x43bc5a0b
+  0x32d5c/0x32d62: CHECK_FMT = 0xc03c5a13 (native 60-byte ABI)
+
+The 12-byte difference is consistent with the ebd_ctrl inserted before
+reserved[]. The shared prefix is 940 bytes; the older reserved[4] begins
+at 940, while native reserved[4] begins at 952. Translation copies the
+prefix and tail separately and zeroes ebd_ctrl. It never reads 968 bytes
+from a 956-byte userspace object. The original native ABI stays intact.
+Only six exact older write commands are mapped, retaining checks for
+magic, direction, number and size. Other legacy layouts are unsupported.
+
+Host tests extracted the actual dispatch/copy helpers and checked all six
+commands, native passthrough, prefix/tail contents, zeroed ebd_ctrl, exact
+copy lengths, and wrong direction/magic/size/number. ASan/UBSan passed
+(with LeakSanitizer disabled because the sandbox uses ptrace).
+
+This is a candidate compatibility fix, not proof that the entire camera
+pipeline works. It still requires real hardware preview, front-camera,
+and capture tests. Do not describe the camera as working until these pass.
