@@ -101,6 +101,9 @@ tune-$(CONFIG_CPU_XSC3)		=$(call cc-option,-mtune=xscale,-mtune=strongarm110) -W
 tune-$(CONFIG_CPU_FEROCEON)	=$(call cc-option,-mtune=marvell-f,-mtune=xscale)
 tune-$(CONFIG_CPU_V6)		=$(call cc-option,-mtune=arm1136j-s,-mtune=strongarm)
 tune-$(CONFIG_CPU_V6K)		=$(call cc-option,-mtune=arm1136j-s,-mtune=strongarm)
+# Spreadtrum SC7731E (pike2): four Cortex-A7 cores. Scheduling only;
+# instruction selection stays -march=armv7-a.
+tune-$(CONFIG_ARCH_SPRD)	=$(call cc-option,-mtune=cortex-a7)
 
 # Evaluate tune cc-option calls now
 tune-y := $(tune-y)
