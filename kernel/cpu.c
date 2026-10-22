@@ -339,6 +339,8 @@ static int take_cpu_down(void *_param)
 	cpu_notify(CPU_DYING | param->mod, param->hcpu);
 	/* Give up timekeeping duties */
 	tick_handover_do_timer();
+	/* Remove CPU from timer broadcasting */
+	tick_offline_cpu(smp_processor_id());
 	/* Park the stopper thread */
 	stop_machine_park((long)param->hcpu);
 	return 0;
