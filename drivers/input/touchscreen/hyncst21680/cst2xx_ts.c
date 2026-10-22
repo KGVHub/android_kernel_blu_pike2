@@ -140,15 +140,19 @@ static irqreturn_t cst2xx_irq(int irq, void *dev_id)
 	ret = cst2xx_read_reg(client, 0xD000, buf, 7);
 	if (ret) {
 		dev_err_ratelimited(&client->dev, "read touch data failed: %d\n", ret);
-		return IRQ_HANDLED;
+		goto ack;
 	}
 
+	/*
+	 * Ack every frame, even ones we skip: until it sees the ack the chip
+	 * raises no further interrupts, so touch would stay dead until reboot.
+	 */
 	if (buf[6] != CST2XX_REPORT_END)
-		return IRQ_HANDLED;
+		goto ack;
 
 	cnt = buf[5] & 0x7f;
 	if (cnt > CST2XX_MAX_FINGERS)
-		return IRQ_HANDLED;
+		goto ack;
 
 	if (cnt > 1) {
 		len = (cnt - 1) * 5 + ((buf[5] & 0x80) ? 3 : 1);
