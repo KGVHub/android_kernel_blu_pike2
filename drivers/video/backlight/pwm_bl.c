@@ -12,6 +12,7 @@
 
 #include <linux/gpio/consumer.h>
 #include <linux/gpio.h>
+#include <linux/kexec.h>
 #include <linux/module.h>
 #include <linux/kernel.h>
 #include <linux/init.h>
@@ -352,6 +353,9 @@ static void pwm_backlight_shutdown(struct platform_device *pdev)
 {
 	struct backlight_device *bl = platform_get_drvdata(pdev);
 	struct pwm_bl_data *pb = bl_get_data(bl);
+
+	if (kexec_in_progress)
+		return;
 
 	pwm_backlight_power_off(pb);
 }

@@ -66,7 +66,12 @@
 
 typedef char note_buf_t[SYSDUMP_NOTE_BYTES];
 
+/* With kexec, kernel/kexec_core.c owns crash_notes (and allocates it). */
+#ifdef CONFIG_KEXEC_CORE
+extern note_buf_t __percpu *crash_notes;
+#else
 note_buf_t __percpu *crash_notes;
+#endif
 
 /* An ELF note in memory */
 struct memelfnote {
@@ -411,7 +416,8 @@ void sysdump_enter(int enter_id, const char *reason, struct pt_regs *regs)
 		sprd_sysdump_info = (struct sysdump_info *)phys_to_virt(sprd_sysdump_info_paddr);
 		pr_emerg("vaddr is %p, paddr is %p.\n", sprd_sysdump_info, (void *)sprd_sysdump_info_paddr);
 
-		crash_notes = alloc_percpu(note_buf_t);
+		if (!crash_notes)
+			crash_notes = alloc_percpu(note_buf_t);
 		if (crash_notes == NULL) {
 			pr_emerg("alloc_percpu failed.\n");
 			while (1) {
@@ -692,7 +698,8 @@ int sysdump_sysctl_init(void)
 	if (!sysdump_sysctl_hdr)
 		return -ENOMEM;
 
-	crash_notes = alloc_percpu(note_buf_t);
+	if (!crash_notes)
+		crash_notes = alloc_percpu(note_buf_t);
 	if (crash_notes == NULL)
 		return -ENOMEM;
 	if (input_register_handler(&sysdump_handler))

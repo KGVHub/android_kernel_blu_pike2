@@ -17,6 +17,9 @@
 #include <linux/kernel.h>
 #include <linux/list.h>
 #include <linux/module.h>
+#include <linux/delay.h>
+#include <linux/io.h>
+#include <linux/kexec.h>
 #include <linux/of.h>
 #include <linux/of_fdt.h>
 #include <linux/of_address.h>
@@ -543,8 +546,56 @@ static int sprd_adf_probe(struct platform_device *pdev)
 	return 0;
 }
 
+/*
+ * Point dispc layer 0 at the bootloader framebuffer (XRGB8888, 1024x600,
+ * physical; the dispc IOMMU only translates its 0x30000000 window) and turn
+ * the other layers off, so a kexec'd kernel
+ * drawing there through simplefb is what the panel shows.
+ */
+#define KEXEC_FB_BASE	0x99cb0000
+#define KEXEC_FB_W	1024
+#define KEXEC_FB_H	600
+
+/* enable, block alpha, 32-bit RGB as Android uses it minus the R/B swap */
+static uint kexec_fb_ctrl = 0x25;
+module_param(kexec_fb_ctrl, uint, 0644);
+
+static void sprd_adf_kexec_handoff(void)
+{
+	void __iomem *base = ioremap(0x20800000, 0x1000);
+	int i;
+
+	if (!base)
+		return;
+
+	pr_info("adf kexec: layer0 addr %08x ctrl %08x mmu %08x\n",
+		readl(base + 0x20), readl(base + 0x30), readl(base + 0x800));
+
+	for (i = 1; i < 6; i++)
+		writel(0, base + 0x20 + i * 0x30 + 0x10);
+
+	writel(KEXEC_FB_BASE, base + 0x20);
+	writel(KEXEC_FB_W | (KEXEC_FB_H << 16), base + 0x20 + 0x14);
+	writel(KEXEC_FB_W, base + 0x20 + 0x18);
+	writel(0, base + 0x20 + 0x1c);
+	writel(0xff, base + 0x20 + 0x20);
+	writel(kexec_fb_ctrl, base + 0x20 + 0x10);
+
+	writel(readl(base + 0x04) | BIT(5), base + 0x04);	/* shadow update */
+	mdelay(40);
+	iounmap(base);
+}
+
 static void sprd_adf_shutdown(struct platform_device *pdev)
 {
+	/* leave the panel lit for the kexec'd kernel's simplefb */
+	if (kexec_in_progress) {
+		/* dispc is clock-gated while blanked; touching it then aborts */
+		if (dpms_state)
+			sprd_adf_kexec_handoff();
+		return;
+	}
+
 	pr_info("adf shutdown\n");
 
 	/* to avoid adf resume after shutdown */
