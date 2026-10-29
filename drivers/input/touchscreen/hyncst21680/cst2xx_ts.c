@@ -17,9 +17,10 @@
  *		TP_MAX_Y = <1024>;
  *	};
  *
- * This driver never writes the controller's firmware: the firmware update
- * paths of the Hynitron driver (boot-time update and the /proc tool
- * interface) are intentionally not included.
+ * The controller has no flash: its firmware lives in RAM and is lost on
+ * every reset, so like the stock driver we load it through the boot ROM at
+ * probe and on resume (cst2xx_load_fw). The /proc tool interface of the
+ * Hynitron driver is not included.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -81,6 +82,99 @@ static int cst2xx_read_reg(struct i2c_client *client, u16 reg, u8 *buf, int len)
 	int ret = i2c_transfer(client->adapter, msgs, 2);
 
 	return ret == 2 ? 0 : (ret < 0 ? ret : -EIO);
+}
+
+#include "cst2xx_fw.h"
+
+/*
+ * Reset into the boot ROM and download the RAM firmware, as the stock kernel
+ * does: handshake D1 11 -> D0 01 reads 0x55, D1 10 enters register mode,
+ * then each 32-bit word goes to 0x6000 + offset as an 8-byte write
+ * (big-endian address, byte-swapped word). Clearing the update key at
+ * 0x20000ffc and D0 13 D0 13 start the firmware; D0 08 returns its checksum.
+ */
+static int cst2xx_load_fw_once(struct cst2xx_ts *ts)
+{
+	struct i2c_client *client = ts->client;
+	static const u8 enter[2] = { 0xD1, 0x11 }, regmode[2] = { 0xD1, 0x10 };
+	static const u8 key[8] = { 0x20, 0x00, 0x0F, 0xFC, 0, 0, 0, 0 };
+	static const u8 run[4] = { 0xD0, 0x13, 0xD0, 0x13 };
+	static const u8 normal[2] = { 0xD1, 0x09 };
+	u8 buf[8];
+	u32 sum;
+	int i, ret;
+
+	gpio_direction_output(ts->rst_gpio, 0);
+	msleep(20);
+	gpio_direction_output(ts->rst_gpio, 1);
+	usleep_range(1000, 1200);
+
+	for (i = 0, ret = -EIO; i < 20; i++) {
+		if (cst2xx_write(client, enter, sizeof(enter))) {
+			usleep_range(2000, 2500);
+			continue;
+		}
+		msleep(10);
+		ret = cst2xx_read_reg(client, 0xD001, buf, 1);
+		if (!ret && buf[0] == 0x55)
+			break;
+		ret = -EIO;
+	}
+	if (ret)
+		return ret;
+
+	ret = cst2xx_write(client, regmode, sizeof(regmode));
+	for (i = 0; !ret && i < sizeof(cst2xx_fw); i += 4) {
+		u32 addr = 0x6000 + i;
+
+		buf[0] = addr >> 24;
+		buf[1] = addr >> 16;
+		buf[2] = addr >> 8;
+		buf[3] = addr;
+		buf[4] = cst2xx_fw[i + 3];
+		buf[5] = cst2xx_fw[i + 2];
+		buf[6] = cst2xx_fw[i + 1];
+		buf[7] = cst2xx_fw[i];
+		ret = cst2xx_write(client, buf, 8);
+	}
+	if (!ret)
+		ret = cst2xx_write(client, key, sizeof(key));
+	if (!ret)
+		ret = cst2xx_write(client, run, sizeof(run));
+	if (ret)
+		return ret;
+	msleep(40);
+
+	for (i = 0; i < 10; i++) {
+		if (!cst2xx_read_reg(client, 0xD000, buf, 1) &&
+		    (buf[0] == 1 || buf[0] == 2))
+			break;
+		usleep_range(2000, 2500);
+	}
+	ret = cst2xx_read_reg(client, 0xD008, buf, 4);
+	if (ret)
+		return ret;
+	sum = buf[0] | buf[1] << 8 | buf[2] << 16 | buf[3] << 24;
+	if (sum != CST2XX_FW_CHECKSUM) {
+		dev_err(&client->dev, "firmware checksum %08x, want %08x\n",
+			sum, CST2XX_FW_CHECKSUM);
+		return -EIO;
+	}
+
+	return cst2xx_write(client, normal, sizeof(normal));
+}
+
+static int cst2xx_load_fw(struct cst2xx_ts *ts)
+{
+	int retry, ret = -EIO;
+
+	for (retry = 0; retry < 3 && ret; retry++)
+		ret = cst2xx_load_fw_once(ts);
+	if (ret)
+		dev_err(&ts->client->dev, "firmware load failed: %d\n", ret);
+	else
+		dev_info(&ts->client->dev, "firmware loaded\n");
+	return ret;
 }
 
 static void cst2xx_hw_reset(struct cst2xx_ts *ts)
@@ -277,6 +371,10 @@ static int cst2xx_probe(struct i2c_client *client, const struct i2c_device_id *i
 		goto err_vdd_off;
 	}
 
+	ret = cst2xx_load_fw(ts);
+	if (ret)
+		goto err_vdd_off;
+
 	input = devm_input_allocate_device(dev);
 	if (!input) {
 		ret = -ENOMEM;
@@ -342,8 +440,8 @@ static const struct i2c_device_id cst2xx_id[] = {
 MODULE_DEVICE_TABLE(i2c, cst2xx_id);
 
 /*
- * The controller stops scanning across a system sleep (the panel rail and its
- * own state are not kept), so wake it with a reset, as the stock driver does.
+ * The controller loses its RAM firmware across a system sleep (the panel rail
+ * goes down), so reload it on resume.
  */
 static int __maybe_unused cst2xx_suspend(struct device *dev)
 {
@@ -358,7 +456,7 @@ static int __maybe_unused cst2xx_resume(struct device *dev)
 {
 	struct cst2xx_ts *ts = i2c_get_clientdata(to_i2c_client(dev));
 
-	cst2xx_hw_reset(ts);
+	cst2xx_load_fw(ts);
 	enable_irq(ts->client->irq);
 	return 0;
 }
