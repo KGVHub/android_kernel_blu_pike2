@@ -341,6 +341,30 @@ static const struct i2c_device_id cst2xx_id[] = {
 };
 MODULE_DEVICE_TABLE(i2c, cst2xx_id);
 
+/*
+ * The controller stops scanning across a system sleep (the panel rail and its
+ * own state are not kept), so wake it with a reset, as the stock driver does.
+ */
+static int __maybe_unused cst2xx_suspend(struct device *dev)
+{
+	struct cst2xx_ts *ts = i2c_get_clientdata(to_i2c_client(dev));
+
+	disable_irq(ts->client->irq);
+	cst2xx_release_all(ts);
+	return 0;
+}
+
+static int __maybe_unused cst2xx_resume(struct device *dev)
+{
+	struct cst2xx_ts *ts = i2c_get_clientdata(to_i2c_client(dev));
+
+	cst2xx_hw_reset(ts);
+	enable_irq(ts->client->irq);
+	return 0;
+}
+
+static SIMPLE_DEV_PM_OPS(cst2xx_pm_ops, cst2xx_suspend, cst2xx_resume);
+
 static const struct of_device_id cst2xx_of_match[] = {
 	{ .compatible = "cst2xx,cst2xx_ts" },
 	{ }
@@ -351,6 +375,7 @@ static struct i2c_driver cst2xx_driver = {
 	.driver = {
 		.name = CST2XX_NAME,
 		.of_match_table = cst2xx_of_match,
+		.pm = &cst2xx_pm_ops,
 	},
 	.probe = cst2xx_probe,
 	.remove = cst2xx_remove,
