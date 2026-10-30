@@ -653,7 +653,7 @@ out_unlock:
 	spin_unlock(&files->file_lock);
 	/* fd > stderr, maybe close fd twice issue */
 	if (fd > 2 && fd != -1)
-		pr_warn("__close_fd %d -EBADF, [%s:%d], [%s:%d]\n",
+		pr_debug("__close_fd %d -EBADF, [%s:%d], [%s:%d]\n",
 			fd, current->group_leader->comm, current->group_leader->pid, current->comm, current->pid);
 
 	return -EBADF;
