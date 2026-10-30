@@ -111,6 +111,13 @@ void adf_post_timeline_signaled(struct adf_device *dev)
 	/*only can signal once*/
 	if (dev->has_signaled)
 		return;
+	/*
+	 * The sw_sync timeline is created lazily by the first post. Before
+	 * that there are no fences to signal, and the next post must still
+	 * advance the timeline itself, so leave has_signaled alone.
+	 */
+	if (!dev->timeline)
+		return;
 	dev->has_signaled = true;
 	adf_sw_advance_timeline(dev);
 }
