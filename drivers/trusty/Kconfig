@@ -9,7 +9,7 @@ config TRUSTY
 	default n
 
 config TRUSTY_LOG
-	tristate
+	tristate "Trusty log driver"
 	depends on TRUSTY
 	default y
 
