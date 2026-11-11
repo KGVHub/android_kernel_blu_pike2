@@ -394,6 +394,14 @@ static int sprd_adi_transfer_one(struct spi_controller *ctlr,
 	return 0;
 }
 
+/*
+ * Bring-up aid (sprd_adi.crash_to_recovery=1): a watchdog reset or a panic
+ * (restart without a command) boots recovery instead of the normal kernel,
+ * so a crashing test kernel lands in TWRP rather than in a reboot loop.
+ */
+static bool crash_to_recovery;
+module_param(crash_to_recovery, bool, 0644);
+
 static void sprd_adi_set_wdt_rst_mode(struct sprd_adi *sadi)
 {
 #if IS_ENABLED(CONFIG_SPRD_WATCHDOG) || IS_ENABLED(CONFIG_SPRD_WATCHDOG_FIQ)
@@ -401,7 +409,10 @@ static void sprd_adi_set_wdt_rst_mode(struct sprd_adi *sadi)
 
 	/* Init watchdog reset mode */
 	sprd_adi_read(sadi, sadi->slave_pbase + sadi->data->rst_sts, &val);
-	val |= HWRST_STATUS_WATCHDOG;
+	if (crash_to_recovery)
+		val = (val & ~0xf0) | HWRST_STATUS_RECOVERY;
+	else
+		val |= HWRST_STATUS_WATCHDOG;
 	sprd_adi_write(sadi, sadi->slave_pbase + sadi->data->rst_sts, val);
 #endif
 }
@@ -415,7 +426,8 @@ static int sprd_adi_restart_handler(struct notifier_block *this,
 	unsigned long opt_code;
 
 	if (!cmd)
-		reboot_mode = HWRST_STATUS_NORMAL;
+		reboot_mode = crash_to_recovery ? HWRST_STATUS_RECOVERY :
+						 HWRST_STATUS_NORMAL;
 	else if (!strncmp(cmd, "recovery", 8))
 		reboot_mode = HWRST_STATUS_RECOVERY;
 	else if (!strncmp(cmd, "alarm", 5))
