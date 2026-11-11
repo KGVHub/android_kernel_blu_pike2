@@ -1088,9 +1088,10 @@ sp9863a-1h10_go_32b_novab-overlay.dtbo-base := sp9863a.dtb
 endif
 
 ifeq ($(BSP_BUILD_FAMILY),pike2)
-dtbo-$(CONFIG_ARCH_SPRD) += sp7731e-1h10-overlay.dtbo
+dtbo-$(CONFIG_ARCH_SPRD) += sp7731e-1h10-overlay.dtbo sp7731e-1h10-iball-overlay.dtbo
 
 sp7731e-1h10-overlay.dtbo-base := sp7731e.dtb
+sp7731e-1h10-iball-overlay.dtbo-base := sp7731e.dtb
 endif
 
 ifeq ($(BSP_BUILD_FAMILY),sharkle)

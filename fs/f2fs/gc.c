@@ -6,6 +6,7 @@
  *             http://www.samsung.com/
  */
 #include <linux/fs.h>
+#include <linux/math64.h>
 #include <linux/module.h>
 #include <linux/backing-dev.h>
 #include <linux/init.h>
@@ -1299,10 +1300,12 @@ skip:
 static void f2fs_update_gc_total_time(struct f2fs_sb_info *sbi,
 		unsigned long long start, unsigned long long end, int gc_type)
 {
-	if (!((end - start) / GC_TIME_RECORD_UNIT))
+	u64 ms = div_u64(end - start, GC_TIME_RECORD_UNIT);
+
+	if (!ms)
 		sbi->sec_stat.gc_ttime[gc_type]++;
 	else
-		sbi->sec_stat.gc_ttime[gc_type] += ((end - start) / GC_TIME_RECORD_UNIT);
+		sbi->sec_stat.gc_ttime[gc_type] += ms;
 }
 
 /* @fs.sec -- 83e29a36b9fb739ea211c0c67aefc4c8 -- */

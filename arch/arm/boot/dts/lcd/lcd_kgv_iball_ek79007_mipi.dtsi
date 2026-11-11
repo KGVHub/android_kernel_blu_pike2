@@ -1,0 +1,69 @@
+/*
+ * iBall Slide Skye 03 panel (stock name "lcd_nt35516_mipi", lcd_id 0x16):
+ * 1024x600 MIPI video mode, 2 lanes. Commands and timings are taken from the
+ * stock Android 8.1 device tree (lcd16@16).
+ */
+
+/ {
+	fragment {
+		target-path = "/";
+		__overlay__ {
+			lcds {
+				lcd_kgv_iball_mipi: lcd_kgv_iball_mipi {
+
+					sprd,dsi-work-mode = <1>; /* video burst mode */
+					sprd,dsi-lane-number = <2>;
+					sprd,dsi-color-format = "rgb888";
+
+					sprd,phy-bit-clock = <597000>;	/* kbps */
+					sprd,phy-escape-clock = <20000>;/* kHz */
+
+					sprd,width-mm = <68>;
+					sprd,height-mm = <121>;
+
+					/* stock power-on: gpio32 1/50ms, 0/50ms, 1/100ms */
+					sprd,reset-on-sequence = <1 50>, <0 50>, <1 100>;
+					sprd,reset-off-sequence = <0 20>;
+
+					sprd,initial-command = [
+						23 00 00 02 B2 10
+						23 00 00 02 80 58
+						23 00 00 02 81 47
+						23 00 00 02 82 D4
+						23 00 00 02 83 88
+						23 00 00 02 84 A9
+						23 00 00 02 85 C3
+						23 00 00 02 86 82
+						13 78 00 01 11
+						13 64 00 01 29
+						];
+					sprd,sleep-in-command = [
+						13 0A 00 01 28
+						13 78 00 01 10
+						];
+					sprd,sleep-out-command = [
+						13 78 00 01 11
+						13 64 00 01 29
+						];
+
+					display-timings {
+						native-mode = <&kgv_iball_timing0>;
+
+						/* 1154 x 622 total at 59 fps */
+						kgv_iball_timing0: timing0 {
+							clock-frequency = <42351412>;
+							hactive = <1024>;
+							vactive = <600>;
+							hback-porch = <60>;
+							hfront-porch = <60>;
+							vback-porch = <10>;
+							vfront-porch = <10>;
+							hsync-len = <10>;
+							vsync-len = <2>;
+						};
+					};
+				};
+			};
+		};
+	};
+};

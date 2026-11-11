@@ -6,6 +6,7 @@
  *             http://www.samsung.com/
  */
 #include <linux/fs.h>
+#include <linux/math64.h>
 #include <linux/bio.h>
 #include <linux/mpage.h>
 #include <linux/writeback.h>
@@ -1636,8 +1637,8 @@ static void f2fs_update_max_cp_interval(struct f2fs_sb_info *sbi)
 	if (!priv_cp_time)
 		goto out;
 
-	cp_interval = ((curr_cp_time - priv_cp_time) / CP_TIME_RECORD_UNIT) ?
-		((curr_cp_time - priv_cp_time) / CP_TIME_RECORD_UNIT) : 1;
+	cp_interval = div_u64(curr_cp_time - priv_cp_time, CP_TIME_RECORD_UNIT) ?:
+		1;
 
 	if (sbi->sec_stat.cp_max_interval < cp_interval)
 		sbi->sec_stat.cp_max_interval = cp_interval;
