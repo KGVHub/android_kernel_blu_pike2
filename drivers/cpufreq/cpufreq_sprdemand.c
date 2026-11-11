@@ -1240,7 +1240,7 @@ gov_sys_pol_attr_rw(down_window_size);
 gov_sys_pol_attr_rw(boostpulse_duration);
 gov_sys_pol_attr_rw(boost);
 
-static struct global_attr boostpulse_gov_sys =
+static struct kobj_attribute boostpulse_gov_sys =
 	__ATTR(boostpulse, 0200, NULL, store_boostpulse_gov_sys);
 
 static struct freq_attr boostpulse_gov_pol =

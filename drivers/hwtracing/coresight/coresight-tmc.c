@@ -127,7 +127,7 @@ struct tmc_drvdata {
 	bool			reading;
 	char			*buf;
 	dma_addr_t		paddr;
-	void __iomem		*vaddr;
+	void			*vaddr;
 	u32			size;
 	bool			enable;
 	enum tmc_config_type	config_type;
@@ -884,22 +884,8 @@ err_misc_register:
 err_devm_kzalloc:
 	if (drvdata->config_type == TMC_CONFIG_TYPE_ETR)
 		dma_free_coherent(dev, drvdata->size,
-				&drvdata->paddr, GFP_KERNEL);
+				drvdata->vaddr, drvdata->paddr);
 	return ret;
-}
-
-static int tmc_remove(struct amba_device *adev)
-{
-	struct tmc_drvdata *drvdata = amba_get_drvdata(adev);
-
-	cpu_pm_unregister_notifier(&drvdata->nb);
-	misc_deregister(&drvdata->miscdev);
-	coresight_unregister(drvdata->csdev);
-	if (drvdata->config_type == TMC_CONFIG_TYPE_ETR)
-		dma_free_coherent(drvdata->dev, drvdata->size,
-				  &drvdata->paddr, GFP_KERNEL);
-
-	return 0;
 }
 
 static struct amba_id tmc_ids[] = {
@@ -914,9 +900,9 @@ static struct amba_driver tmc_driver = {
 	.drv = {
 		.name   = "coresight-tmc",
 		.owner  = THIS_MODULE,
+		.suppress_bind_attrs = true,
 	},
 	.probe		= tmc_probe,
-	.remove		= tmc_remove,
 	.id_table	= tmc_ids,
 };
 

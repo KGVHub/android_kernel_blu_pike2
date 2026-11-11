@@ -158,7 +158,7 @@ MODULE_PARM_DESC(tx_qmult, "Additional queue length multiplier for tx");
 static inline int qlen(struct usb_gadget *gadget, unsigned qmult)
 {
 	if (gadget_is_dualspeed(gadget) && (gadget->speed == USB_SPEED_HIGH ||
-					    gadget->speed == USB_SPEED_SUPER))
+					    gadget->speed >= USB_SPEED_SUPER))
 		return qmult * DEFAULT_QLEN;
 	else
 		return DEFAULT_QLEN;
@@ -295,8 +295,6 @@ rx_submit(struct eth_dev *dev, struct usb_request *req, gfp_t gfp_flags)
 
 	if (!out || !dev->port_usb)
 		return -ENOTCONN;
-
-
 
 	DBG(dev, "%s: size: %zd\n", __func__, size);
 	skb = alloc_skb(size + NET_IP_ALIGN, gfp_flags);
@@ -955,8 +953,9 @@ static netdev_tx_t eth_start_xmit(struct sk_buff *skb,
 	}
 	spin_unlock_irqrestore(&dev->lock, flags);
 
-	if (skb && !in) {
-		dev_kfree_skb_any(skb);
+	if (!in) {
+		if (skb)
+			dev_kfree_skb_any(skb);
 		return NETDEV_TX_OK;
 	}
 

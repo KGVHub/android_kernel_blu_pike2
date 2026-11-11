@@ -87,6 +87,31 @@ int inet_csk_bind_conflict(const struct sock *sk,
 }
 EXPORT_SYMBOL_GPL(inet_csk_bind_conflict);
 
+void inet_csk_update_fastreuse(struct inet_bind_bucket *tb,
+			       struct sock *sk)
+{
+	kuid_t uid = sock_i_uid(sk);
+
+	if (hlist_empty(&tb->owners)) {
+		if (sk->sk_reuse && sk->sk_state != TCP_LISTEN)
+			tb->fastreuse = 1;
+		else
+			tb->fastreuse = 0;
+		if (sk->sk_reuseport) {
+			tb->fastreuseport = 1;
+			tb->fastuid = uid;
+		} else
+			tb->fastreuseport = 0;
+	} else {
+		if (tb->fastreuse &&
+		    (!sk->sk_reuse || sk->sk_state == TCP_LISTEN))
+			tb->fastreuse = 0;
+		if (tb->fastreuseport &&
+		    (!sk->sk_reuseport || !uid_eq(tb->fastuid, uid)))
+			tb->fastreuseport = 0;
+	}
+}
+
 /* Obtain a reference to a local port for the given sock,
  * if snum is zero it means select any available local port.
  */
@@ -216,24 +241,9 @@ tb_not_found:
 	if (!tb && (tb = inet_bind_bucket_create(hashinfo->bind_bucket_cachep,
 					net, head, snum)) == NULL)
 		goto fail_unlock;
-	if (hlist_empty(&tb->owners)) {
-		if (sk->sk_reuse && sk->sk_state != TCP_LISTEN)
-			tb->fastreuse = 1;
-		else
-			tb->fastreuse = 0;
-		if (sk->sk_reuseport) {
-			tb->fastreuseport = 1;
-			tb->fastuid = uid;
-		} else
-			tb->fastreuseport = 0;
-	} else {
-		if (tb->fastreuse &&
-		    (!sk->sk_reuse || sk->sk_state == TCP_LISTEN))
-			tb->fastreuse = 0;
-		if (tb->fastreuseport &&
-		    (!sk->sk_reuseport || !uid_eq(tb->fastuid, uid)))
-			tb->fastreuseport = 0;
-	}
+
+	inet_csk_update_fastreuse(tb, sk);
+
 success:
 	if (!inet_csk(sk)->icsk_bind_hash)
 		inet_bind_hash(sk, tb, snum);
@@ -412,8 +422,10 @@ struct dst_entry *inet_csk_route_req(const struct sock *sk,
 {
 	const struct inet_request_sock *ireq = inet_rsk(req);
 	struct net *net = read_pnet(&ireq->ireq_net);
-	struct ip_options_rcu *opt = ireq->opt;
+	struct ip_options_rcu *opt;
 	struct rtable *rt;
+
+	opt = ireq_opt_deref(ireq);
 
 	flowi4_init_output(fl4, ireq->ir_iif, ireq->ir_mark,
 			   RT_CONN_FLAGS(sk), RT_SCOPE_UNIVERSE,
@@ -448,10 +460,9 @@ struct dst_entry *inet_csk_route_child_sock(const struct sock *sk,
 	struct flowi4 *fl4;
 	struct rtable *rt;
 
+	opt = rcu_dereference(ireq->ireq_opt);
 	fl4 = &newinet->cork.fl.u.ip4;
 
-	rcu_read_lock();
-	opt = rcu_dereference(newinet->inet_opt);
 	flowi4_init_output(fl4, ireq->ir_iif, ireq->ir_mark,
 			   RT_CONN_FLAGS(sk), RT_SCOPE_UNIVERSE,
 			   sk->sk_protocol, inet_sk_flowi_flags(sk),
@@ -464,13 +475,11 @@ struct dst_entry *inet_csk_route_child_sock(const struct sock *sk,
 		goto no_route;
 	if (opt && opt->opt.is_strictroute && rt->rt_uses_gateway)
 		goto route_err;
-	rcu_read_unlock();
 	return &rt->dst;
 
 route_err:
 	ip_rt_put(rt);
 no_route:
-	rcu_read_unlock();
 	IP_INC_STATS_BH(net, IPSTATS_MIB_OUTNOROUTES);
 	return NULL;
 }
@@ -788,7 +797,6 @@ static void inet_child_forget(struct sock *sk, struct request_sock *req,
 		tcp_sk(child)->fastopen_rsk = NULL;
 	}
 	inet_csk_destroy_sock(child);
-	reqsk_put(req);
 }
 
 struct sock *inet_csk_reqsk_queue_add(struct sock *sk,
@@ -859,6 +867,7 @@ void inet_csk_listen_stop(struct sock *sk)
 		sock_hold(child);
 
 		inet_child_forget(sk, req, child);
+		reqsk_put(req);
 		bh_unlock_sock(child);
 		local_bh_enable();
 		sock_put(child);

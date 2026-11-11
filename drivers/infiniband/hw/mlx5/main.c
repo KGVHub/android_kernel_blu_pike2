@@ -905,7 +905,7 @@ static ssize_t show_fw_ver(struct device *device, struct device_attribute *attr,
 {
 	struct mlx5_ib_dev *dev =
 		container_of(device, struct mlx5_ib_dev, ib_dev.dev);
-	return sprintf(buf, "%d.%d.%d\n", fw_rev_maj(dev->mdev),
+	return sprintf(buf, "%d.%d.%04d\n", fw_rev_maj(dev->mdev),
 		       fw_rev_min(dev->mdev), fw_rev_sub(dev->mdev));
 }
 
@@ -1123,6 +1123,8 @@ static int create_umr_res(struct mlx5_ib_dev *dev)
 	qp->real_qp    = qp;
 	qp->uobject    = NULL;
 	qp->qp_type    = MLX5_IB_QPT_REG_UMR;
+	qp->send_cq    = init_attr->send_cq;
+	qp->recv_cq    = init_attr->recv_cq;
 
 	attr->qp_state = IB_QPS_INIT;
 	attr->port_num = 1;

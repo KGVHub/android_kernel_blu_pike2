@@ -1935,17 +1935,6 @@ err_arch_supported:
 	return ret;
 }
 
-static int etm_remove(struct amba_device *adev)
-{
-	struct etm_drvdata *drvdata = amba_get_drvdata(adev);
-
-	coresight_unregister(drvdata->csdev);
-	unregister_hotcpu_notifier(&drvdata->nb);
-	cpu_pm_unregister_notifier(&drvdata->pm_nb);
-
-	return 0;
-}
-
 #ifdef CONFIG_PM
 static int etm_runtime_suspend(struct device *dev)
 {
@@ -2006,9 +1995,9 @@ static struct amba_driver etm_driver = {
 		.name	= "coresight-etm3x",
 		.owner	= THIS_MODULE,
 		.pm	= &etm_dev_pm_ops,
+		.suppress_bind_attrs = true,
 	},
 	.probe		= etm_probe,
-	.remove		= etm_remove,
 	.id_table	= etm_ids,
 };
 

@@ -955,6 +955,10 @@ b_host:
 			 */
 			dev_err(musb->controller, "Babble\n");
 
+			/*
+			 * The vendor condition above also matches DEVCTL_HM
+			 * while not host-active; only recover when host-active.
+			 */
 			if (is_host_active(musb))
 				musb_recover_from_babble(musb);
 		} else {
@@ -1852,6 +1856,7 @@ musb_vbus_show(struct device *dev, struct device_attribute *attr, char *buf)
 	int		vbus;
 	u8		devctl;
 
+	pm_runtime_get_sync(dev);
 	spin_lock_irqsave(&musb->lock, flags);
 	val = musb->a_wait_bcon;
 	vbus = musb_platform_get_vbus_status(musb);
@@ -1865,6 +1870,7 @@ musb_vbus_show(struct device *dev, struct device_attribute *attr, char *buf)
 			vbus = 0;
 	}
 	spin_unlock_irqrestore(&musb->lock, flags);
+	pm_runtime_put_sync(dev);
 
 	return sprintf(buf, "Vbus %s, timeout %lu msec\n",
 			vbus ? "on" : "off", val);
@@ -2214,6 +2220,9 @@ musb_init_controller(struct device *dev, int nIrq, void __iomem *ctrl)
 	/* be sure interrupts are disabled before connecting ISR */
 	musb_platform_disable(musb);
 	musb_generic_disable(musb);
+
+	/* MUSB_POWER_SOFTCONN might be already set, JZ4740 does this. */
+	musb_writeb(musb->mregs, MUSB_POWER, 0);
 
 	/* Init IRQ workqueue before request_irq */
 	INIT_WORK(&musb->irq_work, musb_irq_work);
