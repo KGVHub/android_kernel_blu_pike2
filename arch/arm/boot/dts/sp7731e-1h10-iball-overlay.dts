@@ -239,9 +239,10 @@
 		reg = <0xbfbfc000 0x00384000>;
 	};
 
-	pstore_reserved: ramoops@bff80000 {
+	/* Stock 8.1 address, so the 4.4 ROM can read a failed 4.14 boot's log. */
+	pstore_reserved: ramoops@9e524000 {
 		compatible = "ramoops";
-		reg = <0xbff80000 0x00040000>;
+		reg = <0x9e524000 0x00040000>;
 		record-size = <0x8000>;
 		console-size = <0x8000>;
 		pmsg-size = <0x8000>;
@@ -468,3 +469,14 @@
 		memory-region = <&fd_reserved>;
 	};
 };
+
+/*
+ * Match the iBall's stock 8.1 memory map: the bootloader and the stock
+ * modem/WCN firmware use these addresses.
+ */
+&wcn_reserved { reg = <0x88000000 0x00300000>; };
+&gnss_reserved { reg = <0x88300000 0x0015b000>; };
+&iq_reserved { reg = <0x93100000 0x04000000>; };
+&smem_reserved { reg = <0x87800000 0x00200000>; };
+/* the 8.1 bootloader scans out its splash from lcd_base=0x99cb0000 (600x1024x4) */
+&logo_reserved { reg = <0x99cb0000 0x00258000>; };
