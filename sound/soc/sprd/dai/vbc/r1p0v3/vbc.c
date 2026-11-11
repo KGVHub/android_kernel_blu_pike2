@@ -747,6 +747,17 @@ static int vbc_trigger(struct snd_pcm_substream *substream, int cmd,
 	case SNDRV_PCM_TRIGGER_START:
 	case SNDRV_PCM_TRIGGER_RESUME:
 	case SNDRV_PCM_TRIGGER_PAUSE_RELEASE:
+		/*
+		 * The AD IIS mux setter only runs while its DAPM widget is
+		 * powered, and the HAL selects the codec right after startup,
+		 * before that; startup applied whatever was stored last (the
+		 * HAL leaves DIGFM selected when it closes a stream), so the
+		 * capture read the FM input and never got data. Apply the
+		 * stored selection here, where the stream really starts.
+		 */
+		if (vbc_idx == VBC_CAPTURE01)
+			vbc_try_ad_iismux_set(
+				vbc_codec->sprd_vbc_mux[SPRD_VBC_AD_IISMUX].val);
 		vbc[vbc_idx].arch_enable(chan);
 		vbc[vbc_idx].dma_enable(chan);
 		vbc_eq_enable(1, vbc_codec);
