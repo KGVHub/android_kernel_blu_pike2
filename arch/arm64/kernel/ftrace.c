@@ -58,7 +58,7 @@ int ftrace_update_ftrace_func(ftrace_func_t func)
 	unsigned long pc;
 	u32 new;
 
-	pc = (unsigned long)__va_function(ftrace_call);
+	pc = (unsigned long)&ftrace_call;
 	new = aarch64_insn_gen_branch_imm(pc, (unsigned long)func,
 					  AARCH64_INSN_BRANCH_LINK);
 
@@ -72,7 +72,7 @@ int ftrace_make_call(struct dyn_ftrace *rec, unsigned long addr)
 {
 	unsigned long pc = rec->ip;
 	u32 old, new;
-	long offset = (long)pc - (long)addr;
+	long offset = (long)addr - (long)pc;
 
 	if (offset < -SZ_128M || offset >= SZ_128M) {
 #ifdef CONFIG_ARM64_MODULE_PLTS
@@ -151,22 +151,12 @@ int ftrace_make_nop(struct module *mod, struct dyn_ftrace *rec,
 	unsigned long pc = rec->ip;
 	bool validate = true;
 	u32 old = 0, new;
-	u32 replaced;
-	long offset = (long)pc - (long)addr;
-
-#ifdef CONFIG_CFI_CLANG
-	/* workaround dynamic ftrace with clang's cfi */
-	if (unlikely(mod)) {
-		if (aarch64_insn_read((void *)pc, &replaced))
-			return -EFAULT;
-		if (!aarch64_insn_is_bl(replaced) || !within_module(pc, mod))
-			return -EINVAL;
-		validate = false;
-	}
-#endif
+	long offset = (long)addr - (long)pc;
 
 	if (offset < -SZ_128M || offset >= SZ_128M) {
 #ifdef CONFIG_ARM64_MODULE_PLTS
+		u32 replaced;
+
 		/*
 		 * 'mod' is only set at module load time, but if we end up
 		 * dealing with an out-of-range condition, we can assume it
