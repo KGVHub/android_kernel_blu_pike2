@@ -478,5 +478,15 @@
 &gnss_reserved { reg = <0x88300000 0x0015b000>; };
 &iq_reserved { reg = <0x93100000 0x04000000>; };
 &smem_reserved { reg = <0x87800000 0x00200000>; };
+/*
+ * The nodes that point into those regions must move with them, or the WCN
+ * firmware, the WCN SIPC rings and the LTE SIPC header land in RAM the
+ * kernel hands out (sprdwl_ng then faulted copying into a TX block).
+ */
+&wcn_btwf { reg = <0x88000000 0x00180000>; };
+&wcn_gnss { reg = <0x88300000 0x00100000>; };
+&sipc2 { sprd,smem-info = <0x88180000 0x180000 0x180000>; };
+&sipc3 { sprd,smem-info = <0x8841b000 0x11b000 0x32000>; };
+&sipc0 { sprd,smem-info = <0x87800000 0x87800000 0x200000>; };
 /* the 8.1 bootloader scans out its splash from lcd_base=0x99cb0000 (600x1024x4) */
 &logo_reserved { reg = <0x99cb0000 0x00258000>; };
