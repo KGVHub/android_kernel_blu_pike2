@@ -44,6 +44,16 @@ config ANDROID_BINDER_DEVICES
 	  created. Each binder device has its own context manager, and is
 	  therefore logically separated from the other devices.
 
+config ANDROID_BINDER_IPC_32BIT
+	bool "Use the old 32-bit binder protocol (v7)"
+	depends on !64BIT && ANDROID_BINDER_IPC
+	default n
+	---help---
+	  Binder protocol version 7, with 32-bit binder_uintptr_t and
+	  binder_size_t, for a 32-bit Android user space built with
+	  TARGET_USES_64_BIT_BINDER := false (and vendor blobs that carry
+	  their own 32-bit libbinder).
+
 config ANDROID_BINDER_IPC_SELFTEST
 	bool "Android Binder IPC Driver Selftest"
 	depends on ANDROID_BINDER_IPC
