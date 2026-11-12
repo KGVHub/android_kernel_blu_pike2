@@ -402,6 +402,32 @@ static int sprd_adi_transfer_one(struct spi_controller *ctlr,
 static bool crash_to_recovery;
 module_param(crash_to_recovery, bool, 0644);
 
+/*
+ * The iBall's Android 8.1 bootloader leaves the PMIC watchdog running on a
+ * normal boot and expects the kernel to feed it (4.4's sprd_wdt_sys feeder).
+ * 4.14 hands PMIC watchdog feeding to firmware (androidboot.wdten), which
+ * that setup doesn't run, so the board resets ~15 s into every boot. Stop it
+ * here; restart still uses it for the 50 ms reset.
+ */
+static bool stop_pmic_wdt = true;
+module_param(stop_pmic_wdt, bool, 0644);
+
+static void sprd_adi_stop_pmic_wdt(struct sprd_adi *sadi)
+{
+	u32 wdt_base, val = 0;
+
+	if (!stop_pmic_wdt || !sadi->data->wdt_base)
+		return;
+
+	wdt_base = sadi->slave_pbase + sadi->data->wdt_base;
+	sprd_adi_write(sadi, wdt_base + REG_WDG_LOCK, WDG_UNLOCK_KEY);
+	sprd_adi_read(sadi, wdt_base + REG_WDG_CTRL, &val);
+	dev_info(sadi->dev, "PMIC watchdog ctrl 0x%x, stopping it\n", val);
+	val &= ~(BIT_WDG_RUN | BIT_WDG_RST);
+	sprd_adi_write(sadi, wdt_base + REG_WDG_CTRL, val);
+	sprd_adi_write(sadi, wdt_base + REG_WDG_LOCK, ~WDG_UNLOCK_KEY);
+}
+
 static void sprd_adi_set_wdt_rst_mode(struct sprd_adi *sadi)
 {
 #if IS_ENABLED(CONFIG_SPRD_WATCHDOG) || IS_ENABLED(CONFIG_SPRD_WATCHDOG_FIQ)
@@ -631,8 +657,10 @@ static int sprd_adi_probe(struct platform_device *pdev)
 
 	sprd_adi_hw_init(sadi);
 
-	if (data->pmic_wdt_support)
+	if (data->pmic_wdt_support) {
 		sprd_adi_set_wdt_rst_mode(sadi);
+		sprd_adi_stop_pmic_wdt(sadi);
+	}
 
 	ctlr->dev.of_node = pdev->dev.of_node;
 	ctlr->bus_num = pdev->id;
