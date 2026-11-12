@@ -631,11 +631,26 @@ int swcnblk_get(u8 dst, u8 channel, struct swcnblk_blk *blk, int timeout)
 	spin_lock_irqsave(&ring->p_txlock, flags);
 	if (poolhd->txblk_rdptr != poolhd->txblk_wrptr &&
 	    swcnblk->state == SWCNBLK_STATE_READY) {
+		u32 paddr;
+
 		txpos = swcnblk_get_ringpos(poolhd->txblk_rdptr,
 					    poolhd->txblk_count);
+		paddr = ring->p_txblks[txpos].addr;
 		blk->addr = swcnblk->smem_blk_virt +
-			    (ring->p_txblks[txpos].addr -
-			     swcnblk->mapped_smem_addr);
+			    (paddr - swcnblk->mapped_smem_addr);
+		/* A block outside this channel's TX area would index
+		 * txrecord out of bounds; refuse it instead of crashing. */
+		if (blk->addr < ring->txblk_virt ||
+		    blk->addr >= ring->txblk_virt +
+				 swcnblk->txblknum * swcnblk->txblksz) {
+			pr_err_ratelimited("swcnblk %d-%d: bad pool txblk[%d] addr 0x%x (mapped 0x%x smem 0x%x size 0x%x rd %u wr %u cnt %u)\n",
+				dst, channel, txpos, paddr,
+				swcnblk->mapped_smem_addr, swcnblk->smem_addr,
+				swcnblk->smem_size, poolhd->txblk_rdptr,
+				poolhd->txblk_wrptr, poolhd->txblk_count);
+			spin_unlock_irqrestore(&ring->p_txlock, flags);
+			return -EIO;
+		}
 		blk->length = poolhd->txblk_size;
 		poolhd->txblk_rdptr = poolhd->txblk_rdptr + 1;
 		index = swcnblk_get_index((blk->addr - ring->txblk_virt),

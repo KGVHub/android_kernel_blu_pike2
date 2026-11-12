@@ -490,3 +490,13 @@
 &sipc0 { sprd,smem-info = <0x87800000 0x87800000 0x200000>; };
 /* the 8.1 bootloader scans out its splash from lcd_base=0x99cb0000 (600x1024x4) */
 &logo_reserved { reg = <0x99cb0000 0x00258000>; };
+
+/*
+ * The iBall battery has no BAT_DET line and no thermistor (the stock 4.4
+ * battery node has temp-support = 0): without these the fuel gauge reports
+ * the battery absent at -20 C, and Android shows 0%.
+ */
+&pmic_fgu {
+	sprd,battery-always-present;
+	sprd,no-battery-temp;
+};

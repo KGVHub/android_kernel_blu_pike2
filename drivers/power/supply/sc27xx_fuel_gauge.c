@@ -181,6 +181,9 @@ struct sc27xx_fgu_data {
 	struct iio_channel *channel;
 	struct iio_channel *charge_cha;
 	bool bat_present;
+	/* no BAT_DET line / no thermistor (iBall Slide Skye 03) */
+	bool bat_always_present;
+	bool no_bat_temp;
 	int internal_resist;
 	int total_cap;
 	int init_cap;
@@ -996,6 +999,11 @@ static int sc27xx_fgu_get_temp(struct sc27xx_fgu_data *data, int *temp)
 {
 	int vol, ret;
 
+	if (data->no_bat_temp) {
+		*temp = 250;	/* 25.0 C */
+		return 0;
+	}
+
 	ret = iio_read_channel_processed(data->channel, &vol);
 	if (ret < 0)
 		return ret;
@@ -1607,7 +1615,7 @@ static irqreturn_t sc27xx_fgu_bat_detection(int irq, void *dev_id)
 		return IRQ_RETVAL(state);
 	}
 
-	data->bat_present = !!state;
+	data->bat_present = !!state || data->bat_always_present;
 
 	mutex_unlock(&data->lock);
 
@@ -2461,7 +2469,11 @@ static int sc27xx_fgu_probe(struct platform_device *pdev)
 		return ret;
 	}
 
-	data->bat_present = !!ret;
+	data->bat_always_present =
+		device_property_read_bool(&pdev->dev, "sprd,battery-always-present");
+	data->no_bat_temp =
+		device_property_read_bool(&pdev->dev, "sprd,no-battery-temp");
+	data->bat_present = !!ret || data->bat_always_present;
 	mutex_init(&data->lock);
 	mutex_lock(&data->lock);
 

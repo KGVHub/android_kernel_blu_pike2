@@ -5479,7 +5479,10 @@ static struct charger_desc *of_cm_parse_desc(struct device *dev)
 		if (desc->psy_charger_stat) {
 			for (i = 0; i < num_chgs; i++)
 			{
-				if ((chg_ic != NULL) && strncmp("0", chg_ic, 1) == 0)
+				/* Samsung picks entry 0 or 1 by chg_ic; a board
+				 * with a single charger only has entry 0. */
+				if (num_chgs == 1 || ((chg_ic != NULL) &&
+				    strncmp("0", chg_ic, 1) == 0))
 					of_property_read_string_index(np, "cm-chargers",
 						0, &desc->psy_charger_stat[i]);
 				else

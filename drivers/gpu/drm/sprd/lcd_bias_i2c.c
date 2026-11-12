@@ -73,6 +73,10 @@ int lcd_bias_set_avdd_avee(void)
 	int err;
 	u8 val[4] = {0x13, 0x13, 0x00, 0x00};
 
+	/* Boards without the SM5109C bias chip (iBall: GPIO avdd/avee). */
+	if (!lcd_bias_i2c_client)
+		return 0;
+
 	err = lcd_bias_i2c_write(0x00, &val[0], 1);
 	if (err < 0) {
 		SM_ERR("lcd_bias i2c write reg-0x00 error:%d\n", err);
