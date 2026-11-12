@@ -474,8 +474,8 @@
  * Match the iBall's stock 8.1 memory map: the bootloader and the stock
  * modem/WCN firmware use these addresses.
  */
-&wcn_reserved { reg = <0x88000000 0x00300000>; };
-&gnss_reserved { reg = <0x88300000 0x0015b000>; };
+/* WCN/GNSS keep the Nokia layout (0x84000000): the 4.14 WCN boot only works
+ * there; 4.4 used 0x88000000, which stays ordinary RAM on 4.14. */
 &iq_reserved { reg = <0x93100000 0x04000000>; };
 &smem_reserved { reg = <0x87800000 0x00200000>; };
 /*
@@ -483,10 +483,9 @@
  * firmware, the WCN SIPC rings and the LTE SIPC header land in RAM the
  * kernel hands out (sprdwl_ng then faulted copying into a TX block).
  */
-&wcn_btwf { reg = <0x88000000 0x00180000>; };
-&wcn_gnss { reg = <0x88300000 0x00100000>; };
-&sipc2 { sprd,smem-info = <0x88180000 0x180000 0x180000>; };
-&sipc3 { sprd,smem-info = <0x8841b000 0x11b000 0x32000>; };
+/* GNSS: the WCN boot waits for a GNSS calibration that never completes on 4.14;
+ * without the node it takes its "not include gnss" path and Wi-Fi/BT boot. */
+&wcn_gnss { status = "disabled"; };
 &sipc0 { sprd,smem-info = <0x87800000 0x87800000 0x200000>; };
 /* the 8.1 bootloader scans out its splash from lcd_base=0x99cb0000 (600x1024x4) */
 &logo_reserved { reg = <0x99cb0000 0x00258000>; };

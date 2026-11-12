@@ -1652,11 +1652,62 @@ EXPORT_SYMBOL(get_random_bytes);
  * Returns: 0 if the urandom pool has been seeded.
  *          -ERESTARTSYS if the function was interrupted by a signal.
  */
+/*
+ * Backport of upstream 50ee7529ec45 ("random: try to actively add entropy
+ * rather than passively wait for it"): while someone waits for the CRNG,
+ * generate entropy from CPU/timer jitter. Boards without a hardware RNG
+ * otherwise block getrandom() for a minute at boot (the iBall's BoringSSL
+ * self-test held up Android init for 62 s).
+ */
+static void entropy_timer(unsigned long data)
+{
+	credit_entropy_bits(&input_pool, 1);
+}
+
+static void try_to_generate_entropy(void)
+{
+	struct {
+		unsigned long now;
+		struct timer_list timer;
+	} stack;
+
+	stack.now = random_get_entropy();
+
+	/* Slow counter - or none. Don't even bother */
+	if (stack.now == random_get_entropy())
+		return;
+
+	setup_timer_on_stack(&stack.timer, entropy_timer, 0);
+	while (!crng_ready()) {
+		if (!timer_pending(&stack.timer))
+			mod_timer(&stack.timer, jiffies + 1);
+		mix_pool_bytes(&input_pool, &stack.now, sizeof(stack.now));
+		schedule();
+		stack.now = random_get_entropy();
+	}
+
+	del_timer_sync(&stack.timer);
+	destroy_timer_on_stack(&stack.timer);
+	mix_pool_bytes(&input_pool, &stack.now, sizeof(stack.now));
+}
+
 int wait_for_random_bytes(void)
 {
 	if (likely(crng_ready()))
 		return 0;
-	return wait_event_interruptible(crng_init_wait, crng_ready());
+
+	do {
+		int ret;
+
+		ret = wait_event_interruptible_timeout(crng_init_wait,
+						       crng_ready(), HZ);
+		if (ret)
+			return ret > 0 ? 0 : ret;
+
+		try_to_generate_entropy();
+	} while (!crng_ready());
+
+	return 0;
 }
 EXPORT_SYMBOL(wait_for_random_bytes);
 
