@@ -358,6 +358,22 @@ static int sprd_wdt_probe(struct platform_device *pdev)
 		dev_err(&pdev->dev, "failed to enable wdt\n");
 		return ret;
 	}
+	/*
+	 * Older bootloaders (the iBall's Android 8.1 one) arm the AP watchdog
+	 * on a normal boot and rely on the kernel to feed it, without passing
+	 * androidboot.wdten. Nothing feeds it here, so stop it.
+	 */
+	{
+		u32 ctrl = readl_relaxed(wdt->base + SPRD_WDT_CTRL);
+
+		dev_info(&pdev->dev, "ctrl 0x%x at probe, reset_en %d\n",
+			 ctrl, wdt->reset_en);
+		if (!wdt->reset_en && (ctrl & (SPRD_WDT_CNT_EN_BIT |
+					       SPRD_WDT_RST_EN_BIT))) {
+			dev_info(&pdev->dev, "stopping bootloader watchdog\n");
+			sprd_wdt_stop(&wdt->wdd);
+		}
+	}
 	ret = devm_add_action(&pdev->dev, sprd_wdt_disable, wdt);
 	if (ret) {
 		sprd_wdt_disable(wdt);
